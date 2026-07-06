@@ -195,29 +195,44 @@ class App{
         this.currentSong.innerHTML=name.replace('.mp3','').replace('.wav','')+' <span class="status-badge loading">分析中...</span>';
         this.resultPanel.classList.remove('show');this.visualizer.clearUserData();this.userPitchHistory=[];this.liveScore.reset();this.setState('loading');
         try{
-            this.showLoading('正在解码音频...',0);
-            let fileOrBuf=this.songFiles[name];
-            if(this.isServer&&fileOrBuf&&fileOrBuf.name){
-                // Server mode: fetch MP3 via HTTP
-                const resp=await fetch('audio/'+encodeURIComponent(name));
-                fileOrBuf=await resp.arrayBuffer();
+            this.showLoading('正在下载或读取音频...',0);
+            let fileOrBuf = this.songFiles[name];
+            
+            if(this.isServer && fileOrBuf && fileOrBuf.name){
+                const resp = await fetch('audio/'+encodeURIComponent(name));
+                fileOrBuf = await resp.arrayBuffer();
+            } else if (fileOrBuf instanceof File) {
+                fileOrBuf = await fileOrBuf.arrayBuffer();
             }
-            // 先保存一份副本用于播放（decodeAudioData 会消耗掉原始 ArrayBuffer）
-            const bufForPlayback=fileOrBuf instanceof ArrayBuffer?fileOrBuf.slice(0):null;
+
+            // 🌟 核心修复：在这里精准克隆两份完全独立的内存副本
+            const bufForAnalysis = fileOrBuf.slice(0);
+            const bufForPlayback = fileOrBuf.slice(0);
+
             this.showLoading('正在分析音高轮廓...',30);
-            this.engine.onRefAnalyzed=p=>this.showLoading('正在提取旋律线...',50+Math.round(p*40));
-            this.refData=await this.engine.analyzeReferenceFromFile(fileOrBuf);
-            // Decode audio buffer for playback
-            const ctx=this.engine.ensureContext();
-            const buf=bufForPlayback||(fileOrBuf instanceof ArrayBuffer?fileOrBuf:await fileOrBuf.arrayBuffer());
-            this.audioBuffer=await ctx.decodeAudioData(buf);
+            this.engine.onRefAnalyzed = p => this.showLoading('正在提取旋律线...',50+Math.round(p*40));
+            
+            // 使用第一份副本进行旋律分析
+            this.refData = await this.engine.analyzeReferenceFromFile(bufForAnalysis);
+
+            const ctx = this.engine.ensureContext();
+            this.showLoading('正在解码音频...',80);
+            
+            // 使用第二份副本进行播放解码，彻底杜绝 Detached ArrayBuffer 错误
+            this.audioBuffer = await ctx.decodeAudioData(bufForPlayback);
+
             this.showLoading('正在渲染可视化...',95);
             await new Promise(r=>setTimeout(r,100));
             this.visualizer.setReferenceData(this.refData,this.audioBuffer.duration);
             this.setState('loaded');
             this.currentSong.innerHTML=name.replace('.mp3','').replace('.wav','')+' <span class="status-badge ready">已就绪</span>';
             this.hideLoading();this.emptyState.style.display='none';this.backBtn.classList.add('show');
-        }catch(e){console.error(e);this.hideLoading();this.setState('idle');this.currentSong.innerHTML=name.replace('.mp3','').replace('.wav','')+' <span class="status-badge">加载失败</span>';}
+        }catch(e){
+            console.error(e);
+            this.hideLoading();
+            this.setState('idle');
+            this.currentSong.innerHTML=name.replace('.mp3','').replace('.wav','')+' <span class="status-badge">加载失败</span>';
+        }
     }
     goBack(){
         if(this.state==='singing'||this.state==='playing') this.onStop();
