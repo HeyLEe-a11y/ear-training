@@ -202,12 +202,14 @@ class App{
                 const resp=await fetch('audio/'+encodeURIComponent(name));
                 fileOrBuf=await resp.arrayBuffer();
             }
+            // 先保存一份副本用于播放（decodeAudioData 会消耗掉原始 ArrayBuffer）
+            const bufForPlayback=fileOrBuf instanceof ArrayBuffer?fileOrBuf.slice(0):null;
             this.showLoading('正在分析音高轮廓...',30);
             this.engine.onRefAnalyzed=p=>this.showLoading('正在提取旋律线...',50+Math.round(p*40));
             this.refData=await this.engine.analyzeReferenceFromFile(fileOrBuf);
             // Decode audio buffer for playback
             const ctx=this.engine.ensureContext();
-            const buf=fileOrBuf instanceof ArrayBuffer?fileOrBuf:await fileOrBuf.arrayBuffer();
+            const buf=bufForPlayback||(fileOrBuf instanceof ArrayBuffer?fileOrBuf:await fileOrBuf.arrayBuffer());
             this.audioBuffer=await ctx.decodeAudioData(buf);
             this.showLoading('正在渲染可视化...',95);
             await new Promise(r=>setTimeout(r,100));
