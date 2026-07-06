@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const HOP_MS = 40;
 const FFT_SIZE = 2048;
