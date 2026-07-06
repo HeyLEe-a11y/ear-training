@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视唱练耳 - 自我练习</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .folder-picker {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+        .folder-picker .btn-folder {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 12px;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .folder-picker .btn-folder:hover {
+            border-color: var(--ref-pitch);
+            color: var(--ref-pitch);
+            background: rgba(0, 212, 255, 0.05);
+        }
+        .folder-picker .btn-folder.loaded {
+            border-color: var(--success);
+            color: var(--success);
+            border-style: solid;
+        }
+        .back-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            padding: 6px 10px;
+            font-family: inherit;
+        }
+        .back-btn.show { display: inline-flex; align-items: center; gap: 4px; }
+        .back-btn:hover { color: var(--text-primary); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>视唱练耳</h1>
+                <p>跟唱练习 · 实时音准反馈</p>
+            </div>
+            <div class="folder-picker">
+                <button class="btn-folder" id="btnFolder">+ 选择音频文件夹</button>
+                <input type="file" id="dirPicker" webkitdirectory multiple accept=".mp3" style="display:none">
+            </div>
+            <div class="song-list" id="songList">
+                <div style="padding:30px 20px;text-align:center;color:var(--text-muted);font-size:13px;">
+                    点击上方按钮<br>选择 audio 文件夹
+                </div>
+            </div>
+            <div class="sidebar-footer">共 <span id="songCount">0</span> 首练习曲</div>
+        </aside>
+
+        <main class="main-content">
+            <div class="top-bar">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="切换菜单">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                </button>
+                <div class="mode-selector" id="modeSelector">
+                    <button class="mode-btn active" data-mode="accompanied">有伴奏</button>
+                    <button class="mode-btn" data-mode="a_cappella">无伴奏</button>
+                </div>
+                </button>
+                <button class="back-btn" id="backBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    返回歌曲列表
+                </button>
+                <div class="current-song" id="currentSong">
+                    未选择歌曲
+                    <span class="status-badge" id="statusBadge">就绪</span>
+                </div>
+            </div>
+
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="pitchCanvas"></canvas>
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner">
+                        <div class="spinner-ring"></div>
+                        <p id="loadingText">正在分析音频...</p>
+                        <div class="progress-bar">
+                            <div class="fill" id="loadingProgress"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.4">
+                            <path d="M9 18V5l12-2v13"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <circle cx="18" cy="16" r="3"/>
+                        </svg>
+                    </div>
+                    <p>从左侧选择一首歌曲开始练习</p>
+                </div>
+                <div class="result-panel" id="resultPanel">
+                    <h3>演唱评分</h3>
+                    <div class="result-row">
+                        <span class="label">音准得分</span>
+                        <span class="value" id="pitchScore">--</span>
+                    </div>
+                    <div class="result-row">
+                        <span class="label">节奏得分</span>
+                        <span class="value" id="rhythmScore">--</span>
+                    </div>
+                    <div class="result-divider"></div>
+                    <div class="result-row total">
+                        <span class="label">综合评分</span>
+                        <span class="value" id="totalScore" style="color: var(--text-muted);">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls" id="controls">
+                <button class="btn btn-primary" id="btnPlay" disabled>
+                    <span class="btn-icon">&#9654;</span> 播放示范
+                </button>
+                <button class="btn btn-accent" id="btnSing" disabled>
+                    <span class="btn-icon">&#9835;</span> 开始演唱
+                </button>
+                <button class="btn btn-outline" id="btnStop" disabled>
+                    <span class="btn-icon">&#9632;</span> 停止
+                </button>
+                <div class="score-display" id="scoreDisplay">
+                    <div class="score-item">
+                        <div class="score-label">音准</div>
+                        <div class="score-value" id="livePitchScore">--</div>
+                    </div>
+                    <div class="score-item">
+                        <div class="score-label">进度</div>
+                        <div class="score-value" id="liveProgress">0%</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
